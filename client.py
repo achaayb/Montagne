@@ -25,16 +25,15 @@ class Client:
             )
             self.socket.sendall(packet)
             response = self.socket.recv(24)
-            print(response)
             if response == STR_AUTH_SUCCESS.encode("utf-8"):
-                print("Authentication success")
+                logging.info("Authentication success")
             elif response == STR_AUTH_FAILURE.encode("utf-8"):
-                print("Authentication failure")
+                logging.info("Authentication failure")
 
         except ConnectionRefusedError:
-            print("Connection refused")
+            logging.info("Connection refused")
         except Exception as e:
-            print(f"Error connecting to server: {e}")
+            logging.info(f"Error connecting to server: {e}")
 
     def _create_packet(self, packet_type, payload):
         payload_bytes = payload.encode("utf-8")
@@ -55,14 +54,19 @@ class Client:
     def disconnect(self):
         if self.socket:
             self.socket.close()
-            print("Disconnected from server")
+            logging.info("Disconnected from server")
 
 
 if __name__ == "__main__":
     client = Client("localhost", 5000)
     client.connect()
 
-    while True:
-        message = input("message: ")
-        response = client.send(message)
-        print(response)
+    try:
+        while True:
+            message = input("message: ")
+            response = client.send(message)
+            logging.info(response)
+    except KeyboardInterrupt:
+        logging.info("Manual exit")
+    finally:
+        client.disconnect()
