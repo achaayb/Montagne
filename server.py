@@ -1,22 +1,25 @@
-import socket
 import logging
+import socket
 import struct
-import sqlite3
 from threading import Thread
-from queue import Queue
-from constants import B_AUTHENTICATE, STR_AUTH_FAILURE, STR_AUTH_SUCCESS, LIST_DEFAULT_CREDENTIALS
+
+from constants import (B_AUTHENTICATE, LIST_DEFAULT_CREDENTIALS,
+                       STR_AUTH_FAILURE, STR_AUTH_SUCCESS)
 
 logging.basicConfig(level=logging.INFO)
 
 
 class AuthManager:
     def __init__(self, credentials: list[tuple[str, str]] | None = None):
-        self.credentials = credentials if credentials else LIST_DEFAULT_CREDENTIALS
+        self.credentials = (
+            credentials if credentials else LIST_DEFAULT_CREDENTIALS
+        )  # noqa
 
     def check_credentials(self, username, password):
         if (username, password) in self.credentials:
             return True
         return False
+
 
 class Server:
     def __init__(self, host, port):
@@ -44,7 +47,8 @@ class Server:
             if packet_type == B_AUTHENTICATE:
                 logging.info(f"Auth packet received from {client_address}")
                 credentials_packet = client_socket.recv(next_len)
-                username, password = credentials_packet.decode("utf-8").split(":")
+                credentials_packet = credentials_packet.decode("utf-8")
+                username, password = credentials_packet.split(":")
                 if self.auth_manager.check_credentials(username, password):
                     logging.info(f"Auth accepted from {client_address}")
                     client_socket.sendall(STR_AUTH_SUCCESS.encode("utf-8"))
@@ -53,33 +57,36 @@ class Server:
                     client_socket.sendall(STR_AUTH_FAILURE.encode("utf-8"))
                     continue
             # Creates a thread per connection.
-            client_handler = Thread(target=self._handle_connection, args=(client_socket, client_address))
+            client_handler = Thread(
+                target=self._handle_connection,
+                args=(client_socket, client_address),  # noqa
+            )
             client_handler.start()
             self.connections.append(client_socket)
-    
+
     def close(self):
         self.server.close()
 
     def _close_connection(self, client_socket):
         client_socket.close()
 
-
     def _handle_connection(self, client_socket, client_address):
         try:
             while True:
-                request = client_socket.recv(4096).decode('utf-8')
+                request = client_socket.recv(4096).decode("utf-8")
                 # If connection is closed .recv returns b''
                 if not request:
                     break
-                
-                client_socket.sendall(request.encode('utf-8'))
+
+                client_socket.sendall(request.encode("utf-8"))
         except Exception as e:
             print(f"Error handling client: {e}")
         finally:
             self._close_connection(client_socket)
             logging.info(f"Connection Disconnected {client_address}")
 
+
 if __name__ == "__main__":
-    server = Server('localhost', 5000)
+    server = Server("localhost", 5000)
     server.start()
     server.close()

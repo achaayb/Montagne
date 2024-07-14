@@ -14,4 +14,4 @@ STR_AUTH_FAILURE = "AUTH_FAILURE"
 STR_DISCONNECT = "DISCONNECT"
 
 # Default credentials
-LIST_DEFAULT_CREDENTIALS = [("username","password")]
+LIST_DEFAULT_CREDENTIALS = [("username", "password")]

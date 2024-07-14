@@ -1,7 +1,9 @@
+import logging
 import socket
 import struct
-import logging
-from constants import B_AUTHENTICATE, B_MESSAGE, STR_AUTH_SUCCESS, STR_AUTH_FAILURE, B_TASK
+
+from constants import (B_AUTHENTICATE, B_MESSAGE, STR_AUTH_FAILURE,
+                       STR_AUTH_SUCCESS)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -18,7 +20,9 @@ class Client:
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect((self.host, self.port))
-            packet = self._create_packet(B_AUTHENTICATE, f"{self.username}:{self.password}")
+            packet = self._create_packet(
+                B_AUTHENTICATE, f"{self.username}:{self.password}"
+            )
             self.socket.sendall(packet)
             response = self.socket.recv(24)
             print(response)
@@ -45,7 +49,7 @@ class Client:
     def send(self, payload):
         packet = self._create_packet(B_MESSAGE, payload)
         self.socket.sendall(packet)
-        response = self.socket.recv(4096).decode('utf-8')
+        response = self.socket.recv(4096).decode("utf-8")
         return response
 
     def disconnect(self):
@@ -53,8 +57,9 @@ class Client:
             self.socket.close()
             print("Disconnected from server")
 
+
 if __name__ == "__main__":
-    client = Client('localhost', 5000)
+    client = Client("localhost", 5000)
     client.connect()
 
     while True:
