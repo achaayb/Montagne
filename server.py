@@ -1,14 +1,8 @@
 import json
-import logging
 import socket
 import struct
 from threading import Thread
-
-from constants import (B_ACCEPTED, B_CONNECT, B_DISCONNECT, B_EVENT_DOESNT_EXIST, B_EVENT_TRIGGER,
-                       B_CONNECTED, B_DISCONNECTED, B_REFUSED)
-
-logging.basicConfig(level=logging.INFO)
-
+import pickle
 
 class MontagneServer:
     def __init__(self, host, port):
@@ -16,18 +10,17 @@ class MontagneServer:
         self.port = port
         self.server = None
         self.connections = []
-        self.events = {}
+        self.tasks = {}
 
     def run(self):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.bind((self.host, self.port))
         self.server.listen(5)
-        logging.info(f"Montagne server listening on {self.host}:{self.port}")
-
+        print("# ᨒ↟ ⋆｡°")
+        print(f"# Montagne server running @ {self.host}:{self.port}")
         while True:
             client_socket, client_address = self.server.accept()
-            logging.info(f"Client {client_address} connected")
-            # Creates a thread per connection.
+            print(f"# New connection from {client_address}")
             client_handler = Thread(
                 target=self._connection_handler,
                 args=(client_socket, client_address),  # noqa
@@ -35,38 +28,35 @@ class MontagneServer:
             client_handler.start()
             self.connections.append(client_socket)
 
-    def event(self, tag=None):
+    def task(self, tag=None):
         def decorator(func):
-            self.events[tag] = func
+            self.tasks[tag] = func
             return func
         return decorator
 
     def _connection_handler(self, client_socket, client_address):
         while True:
-            intro_payload = client_socket.recv(6)
-            p_type, b_len = struct.unpack("!HI", intro_payload)
-            if p_type == B_EVENT_TRIGGER:
-                payload_body = client_socket.recv(b_len)
-                payload_json = json.loads(payload_body)
-                event_tag = payload_json.get("tag", None)
-                event_args = payload_json.get("args", [])
-                event_kwargs = payload_json.get("kwargs", {})
-                event = self.events.get(event_tag, None)
-                if not event:
-                    event_not_found_payload = self._create_payload(B_EVENT_DOESNT_EXIST, "")
-                    client_socket.sendall(event_not_found_payload)
-                    logging.info(f"Event {event_tag} not found")
-                else:
-                    event(client_socket, *event_args, **event_kwargs)
-                    print(f"Event {event_tag} done")
-            else:
+            intro_payload = client_socket.recv(13)
+            p_type, b_len = struct.unpack("!5sQ", intro_payload)
+            if p_type != b"EVENT":
                 continue
+            payload_body = client_socket.recv(b_len)
+            payload_json = json.loads(payload_body)
+            task_tag = payload_json.get("tag", None)
+            task_args = payload_json.get("args", [])
+            task_kwargs = payload_json.get("kwargs", {})
+            task = self.tasks.get(task_tag, None)
+            if not task:
+                continue
+            result = task(client_socket, client_address, *task_args, **task_kwargs)
+            result_payload = self._create_payload(b"RESLT", result)
+            client_socket.sendall(result_payload)
+            print(f"# Sent to {client_address}")
 
-
-    def _create_payload(self, packet_type, body):
-        body_bytes = body.encode("utf-8")
+    def _create_payload(self, packet_type, body) -> bytes:
+        body_bytes = pickle.dumps(body)
         body_len = len(body_bytes)
-        header = struct.pack("!BI", packet_type, body_len)
+        header = struct.pack("!5sQ", packet_type, body_len)
         payload = header + body_bytes
         return payload
     
@@ -76,13 +66,15 @@ class MontagneServer:
 
 
 if __name__ == "__main__":
-    montagne_app = MontagneServer("localhost", 5000)
+    montagne_app = MontagneServer("localhost", 5001)
 
-    @montagne_app.event("kaka")
-    def foo(socket, *args, **kwargs):
-        socket.sendall("hi".encode("utf-8"))
+    @montagne_app.task("exc")
+    def foo(socket, client_address, *args, **kwargs):
+        return Exception
 
     try:
         montagne_app.run()
     except KeyboardInterrupt:
+        pass
+    finally:    
         montagne_app.close()

@@ -1,13 +1,8 @@
 import json
-import logging
 import socket
 import struct
 from typing import Any
-
-from constants import (B_CONNECT, B_DISCONNECT, B_EVENT_TRIGGER, B_EVENT_RESPONSE,
-                       B_CONNECTED, B_DISCONNECTED, B_REFUSED)
-
-logging.basicConfig(level=logging.INFO)
+import pickle
 
 
 class MontagneClient:
@@ -31,9 +26,23 @@ class MontagneClient:
             "kwargs": kwargs
         }
         payload_json = json.dumps(payload_dict)
-        intro_payload = self._create_payload(B_EVENT_TRIGGER, payload_json)
-        self.socket.sendall(intro_payload)
+        payload = self._create_payload(b"EVENT", payload_json)
+        self.socket.sendall(payload)
+
+        intro_payload = self.socket.recv(13)
+        r_type, b_len = struct.unpack("!5sQ", intro_payload)
+        if r_type != b"RESLT":
+            return
+        result_body = self.socket.recv(b_len)
+        result = pickle.loads(result_body)
+        return result
         
+    def _create_payload(self, packet_type, body) -> bytes:
+        body_bytes = body.encode("utf-8")
+        body_len = len(body_bytes)
+        header = struct.pack("!5sQ", packet_type, body_len)
+        payload = header + body_bytes
+        return payload
 
     def disconnect(self) -> bool:
         if self.socket:
@@ -41,28 +50,20 @@ class MontagneClient:
             return True
         return False
 
-    def _create_payload(self, packet_type, body) -> bytes:
-        body_bytes = body.encode("utf-8")
-        body_len = len(body_bytes)
-        header = struct.pack("!HI", packet_type, body_len)
-        payload = header + body_bytes
-        return payload
 
 if __name__ == "__main__":
-    client = MontagneClient("localhost", 5000)
+    client = MontagneClient("localhost", 5001)
     client.connect()
-
-    client.send_event("kaka", [1,2,3], {"sda": "asdas"})
 
     try:
         while True:
-            foo = int(input("foo: "))
-            if foo == 1:
-                client.send_event("kaka", [1,2,3], {"sda": "asdas"})
-            elif foo == 2:
-                client.send_event("kdasdsaka", [1,2,3], {"sda": "asdas"})
-            #logging.info(response)
+            foo = input("foo: ")
+            if foo == "a":
+                result = client.send_event("exc", [1,2,3], {"sda": "asdas"})
+                print(type(result))
+            else:
+                continue
     except KeyboardInterrupt:
-        logging.info("Manual exit")
+        pass
     finally:
         client.disconnect()
